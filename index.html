@@ -453,8 +453,24 @@
                 <div class="share-section">
                     <h4>Join a List</h4>
                     <div class="input-group">
-                        <input type="text" id="joinCode" placeholder="Enter share code..." maxlength="6">
+                        <input type="text" id="joinCode" placeholder="Enter List ID or Share Code..." maxlength="50">
                         <button class="btn btn-secondary" onclick="joinList()">Join</button>
+                    </div>
+                    <p style="font-size: 0.8rem; color: #718096; margin-top: 8px;">
+                        Enter either a 6-character share code (ABC123) or full List ID
+                    </p>
+                    
+                    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e2e8f0;">
+                        <h4>Your User ID</h4>
+                        <div class="input-group">
+                            <input type="text" id="currentUserId" readonly style="font-family: monospace; font-size: 0.9rem;">
+                            <button class="btn btn-secondary btn-small" onclick="copyUserId()">Copy</button>
+                            <button class="btn btn-danger btn-small" onclick="resetUserId()">Reset</button>
+                        </div>
+                        <p style="font-size: 0.8rem; color: #718096; margin-top: 8px;">
+                            Share this ID to sync ALL your lists to another device<br>
+                            Or paste someone else's User ID in "Join a List" above
+                        </p>
                     </div>
                 </div>
 
@@ -476,9 +492,14 @@
                         <div>
                             <h2 id="currentListName">My Shopping List</h2>
                             <div class="share-code">
-                                <input type="text" id="currentShareCode" readonly>
-                                <button class="btn btn-secondary btn-small" onclick="copyShareCode()">Copy</button>
+                                <input type="text" id="currentShareCode" readonly placeholder="Share Code">
+                                <button class="btn btn-secondary btn-small" onclick="copyShareCode()">Copy Code</button>
+                                <button class="btn btn-secondary btn-small" onclick="copyListId()">Copy List ID</button>
                                 <button class="btn btn-danger btn-small" onclick="deleteList()">Delete List</button>
+                            </div>
+                            <div class="share-code" style="margin-top: 8px;">
+                                <input type="text" id="currentListId" readonly placeholder="Full List ID" style="font-family: monospace; font-size: 0.8rem;">
+                                <button class="btn btn-secondary btn-small" onclick="shareListLink()">Share Link</button>
                             </div>
                         </div>
                         <div class="collaborators" id="collaborators"></div>
@@ -515,8 +536,8 @@
             // PASTE YOUR CONFIG HERE!
             apiKey: "AIzaSyBna-YARBNGTEeF5hJg8oTwicaudRo8oqI",
             authDomain: "shop-app-57cd9.firebaseapp.com",
-            projectId: "shop-app-57cd9",
-            storageBucket: "shop-app-57cd9.firebasestorage.app",
+            projectId: "shop-app-57cd9"
+            storageBucket: "shop-app-57cd9.firebasestorage.app"
             messagingSenderId: "166816611204",
             appId: "1:166816611204:web:956843c5251e0171dc7bd1"
         };
@@ -553,11 +574,24 @@
     </script>
 
     <script>
-        // App state
-        let currentUser = `User${Math.floor(Math.random() * 1000)}`;
+        // App state - Fixed User ID for testing
+        let currentUser = getUserId();
         let lists = {};
         let currentListId = null;
         let onlineUsers = new Set([currentUser]);
+
+        // Generate or retrieve consistent user ID
+        function getUserId() {
+            let userId = localStorage.getItem('shopsync_user_id');
+            if (!userId) {
+                userId = `User${Math.floor(Math.random() * 1000)}`;
+                localStorage.setItem('shopsync_user_id', userId);
+                console.log('🆔 Created new user ID:', userId);
+            } else {
+                console.log('🆔 Using existing user ID:', userId);
+            }
+            return userId;
+        }
 
         // Item suggestions with categories (same as before)
         const itemSuggestions = {
@@ -582,7 +616,7 @@
             frozen: '🧊', household: '🧽', other: '📦'
         };
 
-        // 🔥 NEW: Firebase Database Functions
+        // 🔥 NEW: Firebase Database Functions - Updated for Global List Sharing
         async function saveListsToFirebase() {
             if (!window.db) {
                 console.log("Firebase not available, using localStorage");
@@ -591,8 +625,25 @@
             }
 
             try {
-                const listsRef = doc(window.db, 'users', currentUser);
-                await setDoc(listsRef, { lists: lists }, { merge: true });
+                // Save user's personal list references
+                const userRef = doc(window.db, 'users', currentUser);
+                const userLists = {};
+                Object.keys(lists).forEach(listId => {
+                    userLists[listId] = {
+                        id: listId,
+                        name: lists[listId].name,
+                        shareCode: lists[listId].shareCode,
+                        joinedAt: new Date().toISOString()
+                    };
+                });
+                await setDoc(userRef, { lists: userLists }, { merge: true });
+
+                // Save each list globally (so anyone can access with list ID)
+                for (const listId of Object.keys(lists)) {
+                    const listRef = doc(window.db, 'shared_lists', listId);
+                    await setDoc(listRef, lists[listId], { merge: true });
+                }
+
                 console.log("✅ Lists saved to Firebase!");
                 updateFirebaseStatus("🔥 Synced to cloud", "#c6f6d5", "#22543d");
             } catch (error) {
@@ -612,12 +663,24 @@
             }
 
             try {
-                const listsRef = doc(window.db, 'users', currentUser);
-                const docSnap = await getDoc(listsRef);
+                // Load user's list references
+                const userRef = doc(window.db, 'users', currentUser);
+                const userSnap = await getDoc(userRef);
                 
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    lists = data.lists || {};
+                if (userSnap.exists()) {
+                    const userData = userSnap.data();
+                    const userListRefs = userData.lists || {};
+                    
+                    // Load each actual list from shared_lists collection
+                    for (const listId of Object.keys(userListRefs)) {
+                        const listRef = doc(window.db, 'shared_lists', listId);
+                        const listSnap = await getDoc(listRef);
+                        
+                        if (listSnap.exists()) {
+                            lists[listId] = listSnap.data();
+                        }
+                    }
+                    
                     console.log("✅ Lists loaded from Firebase!");
                 } else {
                     console.log("No lists found in Firebase, starting fresh");
@@ -639,21 +702,43 @@
         function setupRealTimeSync() {
             if (!window.db) return;
 
-            const listsRef = doc(window.db, 'users', currentUser);
-            onSnapshot(listsRef, (doc) => {
+            // Listen to changes in user's list references
+            const userRef = doc(window.db, 'users', currentUser);
+            onSnapshot(userRef, async (doc) => {
                 if (doc.exists()) {
-                    const data = doc.data();
-                    const newLists = data.lists || {};
+                    const userData = doc.data();
+                    const userListRefs = userData.lists || {};
                     
-                    // Check if data actually changed
-                    if (JSON.stringify(newLists) !== JSON.stringify(lists)) {
-                        lists = newLists;
-                        renderLists();
-                        renderListItems();
-                        showNotification("📱 Lists synced from another device!");
-                        updateFirebaseStatus("🔥 Real-time sync active", "#c6f6d5", "#22543d");
+                    // Check for new lists added
+                    for (const listId of Object.keys(userListRefs)) {
+                        if (!lists[listId]) {
+                            // New list added, load it
+                            const listRef = doc(window.db, 'shared_lists', listId);
+                            const listSnap = await getDoc(listRef);
+                            if (listSnap.exists()) {
+                                lists[listId] = listSnap.data();
+                            }
+                        }
                     }
+                    renderLists();
                 }
+            });
+
+            // Listen to changes in actual lists the user has access to
+            Object.keys(lists).forEach(listId => {
+                const listRef = doc(window.db, 'shared_lists', listId);
+                onSnapshot(listRef, (doc) => {
+                    if (doc.exists()) {
+                        const newListData = doc.data();
+                        if (JSON.stringify(newListData) !== JSON.stringify(lists[listId])) {
+                            lists[listId] = newListData;
+                            renderLists();
+                            renderListItems();
+                            showNotification(`📱 "${newListData.name}" updated by ${newListData.lastModifiedBy || 'someone'}!`);
+                            updateFirebaseStatus("🔥 Real-time sync active", "#c6f6d5", "#22543d");
+                        }
+                    }
+                });
             });
         }
 
@@ -664,16 +749,36 @@
 
         // Initialize the app
         function init() {
+            // Show current user ID
+            document.getElementById('currentUserId').value = currentUser;
+            
             loadListsFromFirebase();
             setupEventListeners();
+            checkUrlParameters();
             
             // Auto-select first list if available after a short delay
             setTimeout(() => {
                 const listIds = Object.keys(lists);
-                if (listIds.length > 0) {
+                if (listIds.length > 0 && !currentListId) {
                     selectList(listIds[0]);
                 }
             }, 1000);
+        }
+
+        function checkUrlParameters() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const listIdFromUrl = urlParams.get('list');
+            
+            if (listIdFromUrl) {
+                // Auto-join list from URL parameter
+                document.getElementById('joinCode').value = listIdFromUrl;
+                setTimeout(() => {
+                    joinList().then(() => {
+                        // Clean up URL
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    });
+                }, 1500); // Wait for Firebase to load
+            }
         }
 
         function setupEventListeners() {
@@ -716,7 +821,9 @@
                 items: {},
                 collaborators: [currentUser],
                 createdAt: new Date().toISOString(),
-                createdBy: currentUser
+                createdBy: currentUser,
+                lastModifiedAt: new Date().toISOString(),
+                lastModifiedBy: currentUser
             };
             
             await saveLists();
@@ -754,6 +861,10 @@
                 addedAt: new Date().toISOString()
             };
             
+            // Update list metadata
+            lists[currentListId].lastModifiedAt = new Date().toISOString();
+            lists[currentListId].lastModifiedBy = currentUser;
+            
             await saveLists();
             renderListItems();
             
@@ -772,6 +883,10 @@
             item.completedBy = item.completed ? currentUser : null;
             item.completedAt = item.completed ? new Date().toISOString() : null;
             
+            // Update list metadata
+            lists[currentListId].lastModifiedAt = new Date().toISOString();
+            lists[currentListId].lastModifiedBy = currentUser;
+            
             await saveLists();
             renderListItems();
             
@@ -784,6 +899,10 @@
             
             const item = lists[currentListId].items[itemId];
             delete lists[currentListId].items[itemId];
+            
+            // Update list metadata
+            lists[currentListId].lastModifiedAt = new Date().toISOString();
+            lists[currentListId].lastModifiedBy = currentUser;
             
             await saveLists();
             renderListItems();
@@ -817,10 +936,27 @@
             const list = lists[listId];
             document.getElementById('currentListName').textContent = list.name;
             document.getElementById('currentShareCode').value = list.shareCode;
+            document.getElementById('currentListId').value = listId;
             
             renderListItems();
             renderCollaborators();
             updateActiveList();
+        }
+
+        function copyListId() {
+            const listIdInput = document.getElementById('currentListId');
+            navigator.clipboard.writeText(listIdInput.value).then(() => {
+                showNotification('📋 List ID copied! Anyone can join with this ID.');
+            });
+        }
+
+        function shareListLink() {
+            const baseUrl = window.location.origin + window.location.pathname;
+            const shareUrl = `${baseUrl}?list=${currentListId}`;
+            
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                showNotification('🔗 Share link copied! Send this link to anyone.');
+            });
         }
 
         function renderLists() {
@@ -860,27 +996,127 @@
 
         async function joinList() {
             const codeInput = document.getElementById('joinCode');
-            const code = codeInput.value.trim().toUpperCase();
+            const code = codeInput.value.trim();
             
             if (!code) {
-                alert('Please enter a share code');
+                alert('Please enter a List ID, Share Code, or User ID');
                 return;
             }
-            
-            // Find list by share code
-            const listId = Object.keys(lists).find(id => lists[id].shareCode === code);
+
+            // Check if it's a User ID (starts with 'User')
+            if (code.startsWith('User')) {
+                return await joinUserLists(code);
+            }
+
+            // Check if it's a direct List ID (longer than 8 characters)
+            if (code.length > 8) {
+                return await joinByListId(code);
+            }
+
+            // Otherwise, treat as share code (6 characters)
+            const shareCode = code.toUpperCase();
+            const listId = Object.keys(lists).find(id => lists[id].shareCode === shareCode);
             
             if (listId) {
                 if (!lists[listId].collaborators.includes(currentUser)) {
                     lists[listId].collaborators.push(currentUser);
+                    lists[listId].lastModifiedBy = currentUser;
                     await saveLists();
                     renderLists();
                 }
                 selectList(listId);
                 codeInput.value = '';
-                showNotification(`🎉 Joined "${lists[listId].name}" successfully!`);
+                showNotification(`🎉 Joined "${lists[listId].name}" via share code!`);
             } else {
                 alert('Invalid share code. Please check and try again.');
+            }
+        }
+
+        async function joinByListId(listId) {
+            if (!window.db) {
+                alert('Firebase not available. Cannot join list.');
+                return;
+            }
+
+            try {
+                // Try to load the list directly from shared_lists collection
+                const listRef = doc(window.db, 'shared_lists', listId);
+                const listSnap = await getDoc(listRef);
+                
+                if (listSnap.exists()) {
+                    const listData = listSnap.data();
+                    
+                    // Add to user's lists
+                    lists[listId] = listData;
+                    
+                    // Add user as collaborator if not already
+                    if (!listData.collaborators.includes(currentUser)) {
+                        lists[listId].collaborators.push(currentUser);
+                        lists[listId].lastModifiedBy = currentUser;
+                    }
+                    
+                    await saveLists();
+                    renderLists();
+                    selectList(listId);
+                    
+                    document.getElementById('joinCode').value = '';
+                    showNotification(`🎉 Joined "${listData.name}" via List ID!`);
+                    
+                    // Set up real-time sync for this new list
+                    setupListRealTimeSync(listId);
+                } else {
+                    alert(`List ID not found. Please check and try again.`);
+                }
+            } catch (error) {
+                console.error('Error joining list by ID:', error);
+                alert('Failed to join list. Please try again.');
+            }
+        }
+
+        function setupListRealTimeSync(listId) {
+            if (!window.db) return;
+            
+            const listRef = doc(window.db, 'shared_lists', listId);
+            onSnapshot(listRef, (doc) => {
+                if (doc.exists()) {
+                    const newListData = doc.data();
+                    if (JSON.stringify(newListData) !== JSON.stringify(lists[listId])) {
+                        lists[listId] = newListData;
+                        renderLists();
+                        renderListItems();
+                        showNotification(`📱 "${newListData.name}" updated by ${newListData.lastModifiedBy || 'someone'}!`);
+                    }
+                }
+            });
+        }
+
+        async function joinUserLists(userId) {
+            if (!window.db) {
+                alert('Firebase not available. Cannot join user lists.');
+                return;
+            }
+
+            try {
+                const userRef = doc(window.db, 'users', userId);
+                const docSnap = await getDoc(userRef);
+                
+                if (docSnap.exists()) {
+                    const userData = docSnap.data();
+                    const userLists = userData.lists || {};
+                    
+                    // Merge the user's lists with current lists
+                    Object.assign(lists, userLists);
+                    await saveLists();
+                    renderLists();
+                    
+                    document.getElementById('joinCode').value = '';
+                    showNotification(`🎉 Joined ${Object.keys(userLists).length} lists from ${userId}!`);
+                } else {
+                    alert(`No lists found for user ${userId}`);
+                }
+            } catch (error) {
+                console.error('Error joining user lists:', error);
+                alert('Failed to join user lists. Please try again.');
             }
         }
 
@@ -995,6 +1231,27 @@
             navigator.clipboard.writeText(textToCopy).then(() => {
                 showNotification('📋 Share code copied to clipboard!');
             });
+        }
+
+        function copyUserId() {
+            navigator.clipboard.writeText(currentUser).then(() => {
+                showNotification('📋 User ID copied! Paste this on other devices.');
+            });
+        }
+
+        function resetUserId() {
+            if (confirm('⚠️ This will create a new User ID and you may lose access to current lists. Continue?')) {
+                localStorage.removeItem('shopsync_user_id');
+                location.reload();
+            }
+        }
+
+        function setCustomUserId() {
+            const newUserId = prompt('Enter User ID to use on this device:');
+            if (newUserId && newUserId.trim()) {
+                localStorage.setItem('shopsync_user_id', newUserId.trim());
+                location.reload();
+            }
         }
 
         function generateId() {
