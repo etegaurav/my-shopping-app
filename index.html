@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShopSync - Smart Shopping Lists</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .sidebar {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            height: fit-content;
+        }
+
+        .list-area {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            min-height: 600px;
+        }
+
+        .create-list {
+            margin-bottom: 30px;
+        }
+
+        .create-list h3 {
+            margin-bottom: 15px;
+            color: #4a5568;
+            font-size: 1.2rem;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f7fafc;
+            color: #4a5568;
+            border: 2px solid #e2e8f0;
+        }
+
+        .btn-secondary:hover {
+            background: #edf2f7;
+        }
+
+        .btn-danger {
+            background: #fed7d7;
+            color: #c53030;
+        }
+
+        .btn-danger:hover {
+            background: #feb2b2;
+        }
+
+        .share-section {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 20px;
+        }
+
+        .share-section h4 {
+            margin-bottom: 15px;
+            color: #4a5568;
+        }
+
+        .share-code {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .share-code input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: #f7fafc;
+            font-family: monospace;
+        }
+
+        .my-lists h3 {
+            margin-bottom: 20px;
+            color: #4a5568;
+            font-size: 1.2rem;
+        }
+
+        .list-item {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .list-item:hover {
+            border-color: #667eea;
+            background: #f7fafc;
+        }
+
+        .list-item.active {
+            border-color: #667eea;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        }
+
+        .list-item-content {
+            flex: 1;
+        }
+
+        .list-item h4 {
+            margin-bottom: 4px;
+            color: #2d3748;
+        }
+
+        .list-item p {
+            color: #718096;
+            font-size: 0.9rem;
+        }
+
+        .list-item-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .list-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .list-header h2 {
+            color: #2d3748;
+            font-size: 1.8rem;
+        }
+
+        .collaborators {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .collaborator {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .add-item-section {
+            margin-bottom: 30px;
+        }
+
+        .add-item-form {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .add-item-form input {
+            flex: 1;
+            padding: 14px 18px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 1rem;
+        }
+
+        .suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .suggestion-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .suggestion-item:hover {
+            background: #f7fafc;
+        }
+
+        .categories {
+            display: grid;
+            gap: 25px;
+        }
+
+        .category {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 20px;
+            border-left: 4px solid;
+        }
+
+        .category.produce { border-left-color: #48bb78; }
+        .category.dairy { border-left-color: #4299e1; }
+        .category.meat { border-left-color: #ed8936; }
+        .category.pantry { border-left-color: #9f7aea; }
+        .category.frozen { border-left-color: #38b2ac; }
+        .category.household { border-left-color: #e53e3e; }
+        .category.other { border-left-color: #718096; }
+
+        .category h4 {
+            margin-bottom: 15px;
+            color: #2d3748;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .category-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .shopping-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+
+        .shopping-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .shopping-item.completed {
+            opacity: 0.6;
+            text-decoration: line-through;
+        }
+
+        .shopping-item input[type="checkbox"] {
+            margin-right: 12px;
+            transform: scale(1.2);
+        }
+
+        .shopping-item-content {
+            flex: 1;
+        }
+
+        .shopping-item-name {
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+
+        .shopping-item-quantity {
+            color: #718096;
+            font-size: 0.9rem;
+        }
+
+        .shopping-item-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 0.8rem;
+            border-radius: 4px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #718096;
+        }
+
+        .empty-state h3 {
+            margin-bottom: 10px;
+            font-size: 1.3rem;
+        }
+
+        .status-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            z-index: 1000;
+        }
+
+        .status-online {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .status-offline {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+        }
+
+        .input-container {
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛒 ShopSync</h1>
+            <p>Smart shopping lists with real-time collaboration</p>
+        </div>
+
+        <div class="main-content">
+            <div class="sidebar">
+                <div class="create-list">
+                    <h3>Create New List</h3>
+                    <div class="input-group">
+                        <input type="text" id="newListName" placeholder="Enter list name..." maxlength="50">
+                        <button class="btn btn-primary" onclick="createList()">Create</button>
+                    </div>
+                </div>
+
+                <div class="share-section">
+                    <h4>Join a List</h4>
+                    <div class="input-group">
+                        <input type="text" id="joinCode" placeholder="Enter share code..." maxlength="6">
+                        <button class="btn btn-secondary" onclick="joinList()">Join</button>
+                    </div>
+                </div>
+
+                <div class="my-lists">
+                    <h3>My Lists</h3>
+                    <div id="listContainer"></div>
+                </div>
+            </div>
+
+            <div class="list-area">
+                <div id="emptyState" class="empty-state">
+                    <h3>Welcome to ShopSync!</h3>
+                    <p>Create a new shopping list or join an existing one to get started.</p>
+                </div>
+                
+                <div id="listContent" style="display: none;">
+                    <div class="list-header">
+                        <div>
+                            <h2 id="currentListName">My Shopping List</h2>
+                            <div class="share-code">
+                                <input type="text" id="currentShareCode" readonly>
+                                <button class="btn btn-secondary btn-small" onclick="copyShareCode()">Copy</button>
+                                <button class="btn btn-danger btn-small" onclick="deleteList()">Delete List</button>
+                            </div>
+                        </div>
+                        <div class="collaborators" id="collaborators"></div>
+                    </div>
+
+                    <div class="add-item-section">
+                        <div class="add-item-form">
+                            <div class="input-container">
+                                <input type="text" id="newItemInput" placeholder="Add item to your list..." autocomplete="off">
+                                <div id="suggestions" class="suggestions" style="display: none;"></div>
+                            </div>
+                            <input type="text" id="newItemQuantity" placeholder="Qty" style="width: 80px;">
+                            <button class="btn btn-primary" onclick="addItem()">Add</button>
+                        </div>
+                    </div>
+
+                    <div id="categoriesContainer" class="categories"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="statusIndicator" class="status-indicator status-online">🟢 Online</div>
+
+    <script>
+        // App state
+        let currentUser = `User${Math.floor(Math.random() * 1000)}`;
+        let lists = JSON.parse(localStorage.getItem('shopsync_lists') || '{}');
+        let currentListId = null;
+        let onlineUsers = new Set([currentUser]);
+
+        // Item suggestions with categories
+        const itemSuggestions = {
+            // Produce
+            'apples': 'produce', 'bananas': 'produce', 'oranges': 'produce', 'grapes': 'produce',
+            'carrots': 'produce', 'broccoli': 'produce', 'spinach': 'produce', 'lettuce': 'produce',
+            'tomatoes': 'produce', 'onions': 'produce', 'potatoes': 'produce', 'garlic': 'produce',
+            
+            // Dairy
+            'milk': 'dairy', 'cheese': 'dairy', 'yogurt': 'dairy', 'butter': 'dairy',
+            'eggs': 'dairy', 'cream': 'dairy', 'sour cream': 'dairy',
+            
+            // Meat
+            'chicken': 'meat', 'beef': 'meat', 'pork': 'meat', 'fish': 'meat',
+            'ground beef': 'meat', 'salmon': 'meat', 'turkey': 'meat',
+            
+            // Pantry
+            'bread': 'pantry', 'rice': 'pantry', 'pasta': 'pantry', 'flour': 'pantry',
+            'sugar': 'pantry', 'salt': 'pantry', 'oil': 'pantry', 'vinegar': 'pantry',
+            'cereal': 'pantry', 'crackers': 'pantry', 'peanut butter': 'pantry',
+            
+            // Frozen
+            'ice cream': 'frozen', 'frozen vegetables': 'frozen', 'frozen pizza': 'frozen',
+            'frozen berries': 'frozen', 'frozen chicken': 'frozen',
+            
+            // Household
+            'toilet paper': 'household', 'paper towels': 'household', 'detergent': 'household',
+            'dish soap': 'household', 'shampoo': 'household', 'toothpaste': 'household'
+        };
+
+        const categoryIcons = {
+            produce: '🥬',
+            dairy: '🥛', 
+            meat: '🍖',
+            pantry: '🥫',
+            frozen: '🧊',
+            household: '🧽',
+            other: '📦'
+        };
+
+        // Initialize the app
+        function init() {
+            renderLists();
+            setupEventListeners();
+            simulateRealTimeUpdates();
+            
+            // Auto-select first list if available
+            const listIds = Object.keys(lists);
+            if (listIds.length > 0) {
+                selectList(listIds[0]);
+            }
+        }
+
+        function setupEventListeners() {
+            // Enter key support
+            document.getElementById('newListName').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') createList();
+            });
+            
+            document.getElementById('joinCode').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') joinList();
+            });
+            
+            document.getElementById('newItemInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') addItem();
+            });
+
+            // Item suggestions
+            document.getElementById('newItemInput').addEventListener('input', showSuggestions);
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('#suggestions') && !e.target.closest('#newItemInput')) {
+                    document.getElementById('suggestions').style.display = 'none';
+                }
+            });
+        }
+
+        function createList() {
+            const nameInput = document.getElementById('newListName');
+            const name = nameInput.value.trim();
+            
+            if (!name) {
+                alert('Please enter a list name');
+                return;
+            }
+            
+            const listId = generateId();
+            const shareCode = generateShareCode();
+            
+            lists[listId] = {
+                id: listId,
+                name: name,
+                shareCode: shareCode,
+                items: {},
+                collaborators: [currentUser],
+                createdAt: new Date().toISOString(),
+                createdBy: currentUser
+            };
+            
+            saveLists();
+            renderLists();
+            selectList(listId);
+            nameInput.value = '';
+            
+            showNotification(`Created "${name}" successfully!`);
+        }
+
+        function joinList() {
+            const codeInput = document.getElementById('joinCode');
+            const code = codeInput.value.trim().toUpperCase();
+            
+            if (!code) {
+                alert('Please enter a share code');
+                return;
+            }
+            
+            // Find list by share code
+            const listId = Object.keys(lists).find(id => lists[id].shareCode === code);
+            
+            if (listId) {
+                if (!lists[listId].collaborators.includes(currentUser)) {
+                    lists[listId].collaborators.push(currentUser);
+                    saveLists();
+                    renderLists();
+                }
+                selectList(listId);
+                codeInput.value = '';
+                showNotification(`Joined "${lists[listId].name}" successfully!`);
+            } else {
+                alert('Invalid share code. Please check and try again.');
+            }
+        }
+
+        function selectList(listId) {
+            currentListId = listId;
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('listContent').style.display = 'block';
+            
+            const list = lists[listId];
+            document.getElementById('currentListName').textContent = list.name;
+            document.getElementById('currentShareCode').value = list.shareCode;
+            
+            renderListItems();
+            renderCollaborators();
+            updateActiveList();
+        }
+
+        function renderLists() {
+            const container = document.getElementById('listContainer');
+            container.innerHTML = '';
+            
+            Object.values(lists).forEach(list => {
+                const itemCount = Object.keys(list.items).length;
+                const completedCount = Object.values(list.items).filter(item => item.completed).length;
+                
+                const listElement = document.createElement('div');
+                listElement.className = 'list-item';
+                listElement.onclick = () => selectList(list.id);
+                
+                listElement.innerHTML = `
+                    <div class="list-item-content">
+                        <h4>${list.name}</h4>
+                        <p>${itemCount} items • ${list.collaborators.length} collaborator${list.collaborators.length !== 1 ? 's' : ''}</p>
+                    </div>
+                    <div class="list-item-actions">
+                        <button class="btn btn-secondary btn-small" onclick="event.stopPropagation(); copyShareCode('${list.shareCode}')">Share</button>
+                    </div>
+                `;
+                
+                container.appendChild(listElement);
+            });
+        }
+
+        function updateActiveList() {
+            document.querySelectorAll('.list-item').forEach((item, index) => {
+                item.classList.remove('active');
+                if (currentListId && Object.keys(lists)[index] === currentListId) {
+                    item.classList.add('active');
+                }
+            });
+        }
+
+        function addItem() {
+            if (!currentListId) return;
+            
+            const nameInput = document.getElementById('newItemInput');
+            const quantityInput = document.getElementById('newItemQuantity');
+            
+            const name = nameInput.value.trim();
+            const quantity = quantityInput.value.trim() || '1';
+            
+            if (!name) {
+                alert('Please enter an item name');
+                return;
+            }
+            
+            const itemId = generateId();
+            const category = itemSuggestions[name.toLowerCase()] || 'other';
+            
+            lists[currentListId].items[itemId] = {
+                id: itemId,
+                name: name,
+                quantity: quantity,
+                category: category,
+                completed: false,
+                addedBy: currentUser,
+                addedAt: new Date().toISOString()
+            };
+            
+            saveLists();
+            renderListItems();
+            
+            nameInput.value = '';
+            quantityInput.value = '';
+            document.getElementById('suggestions').style.display = 'none';
+            
+            // Simulate real-time update
+            setTimeout(() => {
+                showNotification(`${currentUser} added "${name}" to the list`);
+            }, 100);
+        }
+
+        function toggleItem(itemId) {
+            if (!currentListId) return;
+            
+            const item = lists[currentListId].items[itemId];
+            item.completed = !item.completed;
+            item.completedBy = item.completed ? currentUser : null;
+            item.completedAt = item.completed ? new Date().toISOString() : null;
+            
+            saveLists();
+            renderListItems();
+            
+            const action = item.completed ? 'checked off' : 'unchecked';
+            showNotification(`${currentUser} ${action} "${item.name}"`);
+        }
+
+        function removeItem(itemId) {
+            if (!currentListId) return;
+            
+            const item = lists[currentListId].items[itemId];
+            delete lists[currentListId].items[itemId];
+            
+            saveLists();
+            renderListItems();
+            
+            showNotification(`${currentUser} removed "${item.name}" from the list`);
+        }
+
+        function deleteList() {
+            if (!currentListId) return;
+            
+            const list = lists[currentListId];
+            if (confirm(`Are you sure you want to delete "${list.name}"?`)) {
+                delete lists[currentListId];
+                saveLists();
+                renderLists();
+                
+                currentListId = null;
+                document.getElementById('emptyState').style.display = 'block';
+                document.getElementById('listContent').style.display = 'none';
+                
+                showNotification('List deleted successfully');
+            }
+        }
+
+        function renderListItems() {
+            if (!currentListId) return;
+            
+            const list = lists[currentListId];
+            const categories = {};
+            
+            // Group items by category
+            Object.values(list.items).forEach(item => {
+                if (!categories[item.category]) {
+                    categories[item.category] = [];
+                }
+                categories[item.category].push(item);
+            });
+            
+            const container = document.getElementById('categoriesContainer');
+            container.innerHTML = '';
+            
+            // Sort categories
+            const sortedCategories = Object.keys(categories).sort((a, b) => {
+                const order = ['produce', 'dairy', 'meat', 'pantry', 'frozen', 'household', 'other'];
+                return order.indexOf(a) - order.indexOf(b);
+            });
+            
+            sortedCategories.forEach(categoryName => {
+                const items = categories[categoryName];
+                const categoryElement = document.createElement('div');
+                categoryElement.className = `category ${categoryName}`;
+                
+                categoryElement.innerHTML = `
+                    <h4>
+                        <span class="category-icon">${categoryIcons[categoryName]}</span>
+                        ${categoryName.charAt(0).toUpperCase() + categoryName.slice(1)}
+                        <span style="color: #718096; font-weight: normal; margin-left: 8px;">(${items.length})</span>
+                    </h4>
+                    <div class="category-items">
+                        ${items.map(item => `
+                            <div class="shopping-item ${item.completed ? 'completed' : ''}">
+                                <input type="checkbox" ${item.completed ? 'checked' : ''} 
+                                       onchange="toggleItem('${item.id}')">
+                                <div class="shopping-item-content">
+                                    <div class="shopping-item-name">${item.name}</div>
+                                    <div class="shopping-item-quantity">Qty: ${item.quantity}</div>
+                                </div>
+                                <div class="shopping-item-actions">
+                                    <button class="btn btn-danger btn-small" onclick="removeItem('${item.id}')">Remove</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                
+                container.appendChild(categoryElement);
+            });
+            
+            renderLists(); // Update list counts
+        }
+
+        function renderCollaborators() {
+            if (!currentListId) return;
+            
+            const list = lists[currentListId];
+            const container = document.getElementById('collaborators');
+            container.innerHTML = '';
+            
+            list.collaborators.forEach(collaborator => {
+                const isOnline = onlineUsers.has(collaborator);
+                const element = document.createElement('div');
+                element.className = 'collaborator';
+                element.title = `${collaborator} (${isOnline ? 'online' : 'offline'})`;
+                element.style.opacity = isOnline ? '1' : '0.5';
+                element.textContent = collaborator.charAt(0).toUpperCase();
+                container.appendChild(element);
+            });
+        }
+
+        function showSuggestions() {
+            const input = document.getElementById('newItemInput');
+            const suggestionsDiv = document.getElementById('suggestions');
+            const query = input.value.toLowerCase().trim();
+            
+            if (query.length < 1) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+            
+            const matches = Object.keys(itemSuggestions)
+                .filter(item => item.toLowerCase().includes(query))
+                .slice(0, 5);
+            
+            if (matches.length > 0) {
+                suggestionsDiv.innerHTML = matches
+                    .map(item => `<div class="suggestion-item" onclick="selectSuggestion('${item}')">${item}</div>`)
+                    .join('');
+                suggestionsDiv.style.display = 'block';
+            } else {
+                suggestionsDiv.style.display = 'none';
+            }
+        }
+
+        function selectSuggestion(item) {
+            document.getElementById('newItemInput').value = item;
+            document.getElementById('suggestions').style.display = 'none';
+        }
+
+        function copyShareCode(code = null) {
+            const shareCodeInput = document.getElementById('currentShareCode');
+            const textToCopy = code || shareCodeInput.value;
+            
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showNotification('Share code copied to clipboard!');
+            });
+        }
+
+        function saveLists() {
+            localStorage.setItem('shopsync_lists', JSON.stringify(lists));
+        }
+
+        function generateId() {
+            return Math.random().toString(36).substr(2, 9);
+        }
+
+        function generateShareCode() {
+            return Math.random().toString(36).substr(2, 6).toUpperCase();
+        }
+
+        function showNotification(message) {
+            // Simple notification system
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 70px;
+                right: 20px;
+                background: #2d3748;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                z-index: 1001;
+                animation: slideIn 0.3s ease;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        function simulateRealTimeUpdates() {
+            // Simulate other users joining/leaving
+            setInterval(() => {
+                const users = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve'];
+                const randomUser = users[Math.floor(Math.random() * users.length)];
+                
+                if (Math.random() > 0.5) {
+                    onlineUsers.add(randomUser);
+                } else {
+                    onlineUsers.delete(randomUser);
+                }
+                
+                renderCollaborators();
+            }, 10000);
+            
+            // Simulate connection status
+            setInterval(() => {
+                const indicator = document.getElementById('statusIndicator');
+                if (Math.random() > 0.95) {
+                    indicator.className = 'status-indicator status-offline';
+                    indicator.innerHTML = '🔴 Offline';
+                    setTimeout(() => {
+                        indicator.className = 'status-indicator status-online';
+                        indicator.innerHTML = '🟢 Online';
+                    }, 2000);
+                }
+            }, 30000);
+        }
+
+        // Add CSS animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            
+            @keyframes pulse {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+            }
+            
+            .shopping-item:hover {
+                animation: pulse 0.3s ease;
+            }
+            
+            .list-item:hover {
+                animation: pulse 0.2s ease;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Initialize the app when page loads
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
