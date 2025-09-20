@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShopSync - Smart Shopping Lists</title>
+    <title>ShopSync - Cloud Shopping Lists</title>
     <style>
         * {
             margin: 0;
@@ -401,6 +401,19 @@
             color: #742a2a;
         }
 
+        .firebase-status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            z-index: 1000;
+            background: #bee3f8;
+            color: #2b6cb0;
+        }
+
         @media (max-width: 768px) {
             .main-content {
                 grid-template-columns: 1fr;
@@ -423,8 +436,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🛒 ShopSync</h1>
-            <p>Smart shopping lists with real-time collaboration</p>
+            <h1>🛒 ShopSync Cloud</h1>
+            <p>Smart shopping lists with real-time cloud sync</p>
         </div>
 
         <div class="main-content">
@@ -453,7 +466,8 @@
 
             <div class="list-area">
                 <div id="emptyState" class="empty-state">
-                    <h3>Welcome to ShopSync!</h3>
+                    <h3>Welcome to ShopSync Cloud!</h3>
+                    <p>Your lists are now saved in the cloud and sync across all devices.</p>
                     <p>Create a new shopping list or join an existing one to get started.</p>
                 </div>
                 
@@ -488,68 +502,181 @@
     </div>
 
     <div id="statusIndicator" class="status-indicator status-online">🟢 Online</div>
+    <div id="firebaseStatus" class="firebase-status">🔥 Connecting to Firebase...</div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Import Firebase
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js';
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, addDoc, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js';
+
+        // 🔥 REPLACE THIS WITH YOUR FIREBASE CONFIG (from Step 1)
+        const firebaseConfig = {
+            // PASTE YOUR CONFIG HERE!
+            apiKey: "your-api-key-here",
+            authDomain: "your-project.firebaseapp.com",
+            projectId: "your-project-id",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "your-app-id"
+        };
+
+        // Initialize Firebase
+        let db;
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            console.log("🔥 Firebase connected successfully!");
+            updateFirebaseStatus("🔥 Connected to Firebase", "#c6f6d5", "#22543d");
+        } catch (error) {
+            console.error("Firebase connection failed:", error);
+            updateFirebaseStatus("❌ Firebase connection failed", "#fed7d7", "#c53030");
+        }
+
+        function updateFirebaseStatus(text, bg, color) {
+            const status = document.getElementById('firebaseStatus');
+            status.textContent = text;
+            status.style.background = bg;
+            status.style.color = color;
+        }
+
+        // Make Firebase functions available globally
+        window.db = db;
+        window.doc = doc;
+        window.setDoc = setDoc;
+        window.getDoc = getDoc;
+        window.onSnapshot = onSnapshot;
+        window.collection = collection;
+        window.addDoc = addDoc;
+        window.updateDoc = updateDoc;
+        window.deleteDoc = deleteDoc;
+    </script>
 
     <script>
         // App state
         let currentUser = `User${Math.floor(Math.random() * 1000)}`;
-        let lists = JSON.parse(localStorage.getItem('shopsync_lists') || '{}');
+        let lists = {};
         let currentListId = null;
         let onlineUsers = new Set([currentUser]);
 
-        // Item suggestions with categories
+        // Item suggestions with categories (same as before)
         const itemSuggestions = {
-            // Produce
             'apples': 'produce', 'bananas': 'produce', 'oranges': 'produce', 'grapes': 'produce',
             'carrots': 'produce', 'broccoli': 'produce', 'spinach': 'produce', 'lettuce': 'produce',
             'tomatoes': 'produce', 'onions': 'produce', 'potatoes': 'produce', 'garlic': 'produce',
-            
-            // Dairy
             'milk': 'dairy', 'cheese': 'dairy', 'yogurt': 'dairy', 'butter': 'dairy',
             'eggs': 'dairy', 'cream': 'dairy', 'sour cream': 'dairy',
-            
-            // Meat
             'chicken': 'meat', 'beef': 'meat', 'pork': 'meat', 'fish': 'meat',
             'ground beef': 'meat', 'salmon': 'meat', 'turkey': 'meat',
-            
-            // Pantry
             'bread': 'pantry', 'rice': 'pantry', 'pasta': 'pantry', 'flour': 'pantry',
             'sugar': 'pantry', 'salt': 'pantry', 'oil': 'pantry', 'vinegar': 'pantry',
             'cereal': 'pantry', 'crackers': 'pantry', 'peanut butter': 'pantry',
-            
-            // Frozen
             'ice cream': 'frozen', 'frozen vegetables': 'frozen', 'frozen pizza': 'frozen',
             'frozen berries': 'frozen', 'frozen chicken': 'frozen',
-            
-            // Household
             'toilet paper': 'household', 'paper towels': 'household', 'detergent': 'household',
             'dish soap': 'household', 'shampoo': 'household', 'toothpaste': 'household'
         };
 
         const categoryIcons = {
-            produce: '🥬',
-            dairy: '🥛', 
-            meat: '🍖',
-            pantry: '🥫',
-            frozen: '🧊',
-            household: '🧽',
-            other: '📦'
+            produce: '🥬', dairy: '🥛', meat: '🍖', pantry: '🥫',
+            frozen: '🧊', household: '🧽', other: '📦'
         };
 
-        // Initialize the app
-        function init() {
-            renderLists();
-            setupEventListeners();
-            simulateRealTimeUpdates();
-            
-            // Auto-select first list if available
-            const listIds = Object.keys(lists);
-            if (listIds.length > 0) {
-                selectList(listIds[0]);
+        // 🔥 NEW: Firebase Database Functions
+        async function saveListsToFirebase() {
+            if (!window.db) {
+                console.log("Firebase not available, using localStorage");
+                localStorage.setItem('shopsync_lists', JSON.stringify(lists));
+                return;
+            }
+
+            try {
+                const listsRef = doc(window.db, 'users', currentUser);
+                await setDoc(listsRef, { lists: lists }, { merge: true });
+                console.log("✅ Lists saved to Firebase!");
+                updateFirebaseStatus("🔥 Synced to cloud", "#c6f6d5", "#22543d");
+            } catch (error) {
+                console.error("Error saving to Firebase:", error);
+                updateFirebaseStatus("⚠️ Sync failed", "#fed7d7", "#c53030");
+                // Fallback to localStorage
+                localStorage.setItem('shopsync_lists', JSON.stringify(lists));
             }
         }
 
+        async function loadListsFromFirebase() {
+            if (!window.db) {
+                console.log("Firebase not available, using localStorage");
+                lists = JSON.parse(localStorage.getItem('shopsync_lists') || '{}');
+                renderLists();
+                return;
+            }
+
+            try {
+                const listsRef = doc(window.db, 'users', currentUser);
+                const docSnap = await getDoc(listsRef);
+                
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    lists = data.lists || {};
+                    console.log("✅ Lists loaded from Firebase!");
+                } else {
+                    console.log("No lists found in Firebase, starting fresh");
+                    lists = {};
+                }
+                
+                renderLists();
+                setupRealTimeSync();
+                
+            } catch (error) {
+                console.error("Error loading from Firebase:", error);
+                updateFirebaseStatus("⚠️ Load failed", "#fed7d7", "#c53030");
+                // Fallback to localStorage
+                lists = JSON.parse(localStorage.getItem('shopsync_lists') || '{}');
+                renderLists();
+            }
+        }
+
+        function setupRealTimeSync() {
+            if (!window.db) return;
+
+            const listsRef = doc(window.db, 'users', currentUser);
+            onSnapshot(listsRef, (doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    const newLists = data.lists || {};
+                    
+                    // Check if data actually changed
+                    if (JSON.stringify(newLists) !== JSON.stringify(lists)) {
+                        lists = newLists;
+                        renderLists();
+                        renderListItems();
+                        showNotification("📱 Lists synced from another device!");
+                        updateFirebaseStatus("🔥 Real-time sync active", "#c6f6d5", "#22543d");
+                    }
+                }
+            });
+        }
+
+        // Update all save functions to use Firebase
+        function saveLists() {
+            saveListsToFirebase();
+        }
+
+        // Initialize the app
+        function init() {
+            loadListsFromFirebase();
+            setupEventListeners();
+            
+            // Auto-select first list if available after a short delay
+            setTimeout(() => {
+                const listIds = Object.keys(lists);
+                if (listIds.length > 0) {
+                    selectList(listIds[0]);
+                }
+            }, 1000);
+        }
+
         function setupEventListeners() {
-            // Enter key support
             document.getElementById('newListName').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') createList();
             });
@@ -562,7 +689,6 @@
                 if (e.key === 'Enter') addItem();
             });
 
-            // Item suggestions
             document.getElementById('newItemInput').addEventListener('input', showSuggestions);
             document.addEventListener('click', function(e) {
                 if (!e.target.closest('#suggestions') && !e.target.closest('#newItemInput')) {
@@ -571,7 +697,7 @@
             });
         }
 
-        function createList() {
+        async function createList() {
             const nameInput = document.getElementById('newListName');
             const name = nameInput.value.trim();
             
@@ -593,40 +719,96 @@
                 createdBy: currentUser
             };
             
-            saveLists();
+            await saveLists();
             renderLists();
             selectList(listId);
             nameInput.value = '';
             
-            showNotification(`Created "${name}" successfully!`);
+            showNotification(`✅ Created "${name}" and saved to cloud!`);
         }
 
-        function joinList() {
-            const codeInput = document.getElementById('joinCode');
-            const code = codeInput.value.trim().toUpperCase();
+        async function addItem() {
+            if (!currentListId) return;
             
-            if (!code) {
-                alert('Please enter a share code');
+            const nameInput = document.getElementById('newItemInput');
+            const quantityInput = document.getElementById('newItemQuantity');
+            
+            const name = nameInput.value.trim();
+            const quantity = quantityInput.value.trim() || '1';
+            
+            if (!name) {
+                alert('Please enter an item name');
                 return;
             }
             
-            // Find list by share code
-            const listId = Object.keys(lists).find(id => lists[id].shareCode === code);
+            const itemId = generateId();
+            const category = itemSuggestions[name.toLowerCase()] || 'other';
             
-            if (listId) {
-                if (!lists[listId].collaborators.includes(currentUser)) {
-                    lists[listId].collaborators.push(currentUser);
-                    saveLists();
-                    renderLists();
-                }
-                selectList(listId);
-                codeInput.value = '';
-                showNotification(`Joined "${lists[listId].name}" successfully!`);
-            } else {
-                alert('Invalid share code. Please check and try again.');
+            lists[currentListId].items[itemId] = {
+                id: itemId,
+                name: name,
+                quantity: quantity,
+                category: category,
+                completed: false,
+                addedBy: currentUser,
+                addedAt: new Date().toISOString()
+            };
+            
+            await saveLists();
+            renderListItems();
+            
+            nameInput.value = '';
+            quantityInput.value = '';
+            document.getElementById('suggestions').style.display = 'none';
+            
+            showNotification(`📝 Added "${name}" and synced to cloud!`);
+        }
+
+        async function toggleItem(itemId) {
+            if (!currentListId) return;
+            
+            const item = lists[currentListId].items[itemId];
+            item.completed = !item.completed;
+            item.completedBy = item.completed ? currentUser : null;
+            item.completedAt = item.completed ? new Date().toISOString() : null;
+            
+            await saveLists();
+            renderListItems();
+            
+            const action = item.completed ? 'checked off' : 'unchecked';
+            showNotification(`✅ ${action} "${item.name}" and synced!`);
+        }
+
+        async function removeItem(itemId) {
+            if (!currentListId) return;
+            
+            const item = lists[currentListId].items[itemId];
+            delete lists[currentListId].items[itemId];
+            
+            await saveLists();
+            renderListItems();
+            
+            showNotification(`🗑️ Removed "${item.name}" and synced!`);
+        }
+
+        async function deleteList() {
+            if (!currentListId) return;
+            
+            const list = lists[currentListId];
+            if (confirm(`Are you sure you want to delete "${list.name}"?`)) {
+                delete lists[currentListId];
+                await saveLists();
+                renderLists();
+                
+                currentListId = null;
+                document.getElementById('emptyState').style.display = 'block';
+                document.getElementById('listContent').style.display = 'none';
+                
+                showNotification('🗑️ List deleted and synced to cloud!');
             }
         }
 
+        // All other functions remain the same...
         function selectList(listId) {
             currentListId = listId;
             document.getElementById('emptyState').style.display = 'none';
@@ -676,87 +858,29 @@
             });
         }
 
-        function addItem() {
-            if (!currentListId) return;
+        async function joinList() {
+            const codeInput = document.getElementById('joinCode');
+            const code = codeInput.value.trim().toUpperCase();
             
-            const nameInput = document.getElementById('newItemInput');
-            const quantityInput = document.getElementById('newItemQuantity');
-            
-            const name = nameInput.value.trim();
-            const quantity = quantityInput.value.trim() || '1';
-            
-            if (!name) {
-                alert('Please enter an item name');
+            if (!code) {
+                alert('Please enter a share code');
                 return;
             }
             
-            const itemId = generateId();
-            const category = itemSuggestions[name.toLowerCase()] || 'other';
+            // Find list by share code
+            const listId = Object.keys(lists).find(id => lists[id].shareCode === code);
             
-            lists[currentListId].items[itemId] = {
-                id: itemId,
-                name: name,
-                quantity: quantity,
-                category: category,
-                completed: false,
-                addedBy: currentUser,
-                addedAt: new Date().toISOString()
-            };
-            
-            saveLists();
-            renderListItems();
-            
-            nameInput.value = '';
-            quantityInput.value = '';
-            document.getElementById('suggestions').style.display = 'none';
-            
-            // Simulate real-time update
-            setTimeout(() => {
-                showNotification(`${currentUser} added "${name}" to the list`);
-            }, 100);
-        }
-
-        function toggleItem(itemId) {
-            if (!currentListId) return;
-            
-            const item = lists[currentListId].items[itemId];
-            item.completed = !item.completed;
-            item.completedBy = item.completed ? currentUser : null;
-            item.completedAt = item.completed ? new Date().toISOString() : null;
-            
-            saveLists();
-            renderListItems();
-            
-            const action = item.completed ? 'checked off' : 'unchecked';
-            showNotification(`${currentUser} ${action} "${item.name}"`);
-        }
-
-        function removeItem(itemId) {
-            if (!currentListId) return;
-            
-            const item = lists[currentListId].items[itemId];
-            delete lists[currentListId].items[itemId];
-            
-            saveLists();
-            renderListItems();
-            
-            showNotification(`${currentUser} removed "${item.name}" from the list`);
-        }
-
-        function deleteList() {
-            if (!currentListId) return;
-            
-            const list = lists[currentListId];
-            if (confirm(`Are you sure you want to delete "${list.name}"?`)) {
-                delete lists[currentListId];
-                saveLists();
-                renderLists();
-                
-                currentListId = null;
-                document.getElementById('emptyState').style.display = 'block';
-                document.getElementById('listContent').style.display = 'none';
-                
-                showNotification('List deleted successfully');
+            if (listId) {
+                if (!lists[listId].collaborators.includes(currentUser)) {
+                    lists[listId].collaborators.push(currentUser);
+                    await saveLists();
+                    renderLists();
+                }
+                selectList(listId);
+                codeInput.value = '';
+                showNotification(`🎉 Joined "${lists[listId].name}" successfully!`);
+            } else {
+                alert('Invalid share code. Please check and try again.');
             }
         }
 
@@ -869,12 +993,8 @@
             const textToCopy = code || shareCodeInput.value;
             
             navigator.clipboard.writeText(textToCopy).then(() => {
-                showNotification('Share code copied to clipboard!');
+                showNotification('📋 Share code copied to clipboard!');
             });
-        }
-
-        function saveLists() {
-            localStorage.setItem('shopsync_lists', JSON.stringify(lists));
         }
 
         function generateId() {
@@ -886,7 +1006,6 @@
         }
 
         function showNotification(message) {
-            // Simple notification system
             const notification = document.createElement('div');
             notification.style.cssText = `
                 position: fixed;
@@ -898,42 +1017,23 @@
                 border-radius: 8px;
                 z-index: 1001;
                 animation: slideIn 0.3s ease;
+                max-width: 300px;
             `;
             notification.textContent = message;
             document.body.appendChild(notification);
             
             setTimeout(() => {
                 notification.remove();
-            }, 3000);
+            }, 4000);
         }
 
-        function simulateRealTimeUpdates() {
-            // Simulate other users joining/leaving
-            setInterval(() => {
-                const users = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve'];
-                const randomUser = users[Math.floor(Math.random() * users.length)];
-                
-                if (Math.random() > 0.5) {
-                    onlineUsers.add(randomUser);
-                } else {
-                    onlineUsers.delete(randomUser);
-                }
-                
-                renderCollaborators();
-            }, 10000);
-            
-            // Simulate connection status
-            setInterval(() => {
-                const indicator = document.getElementById('statusIndicator');
-                if (Math.random() > 0.95) {
-                    indicator.className = 'status-indicator status-offline';
-                    indicator.innerHTML = '🔴 Offline';
-                    setTimeout(() => {
-                        indicator.className = 'status-indicator status-online';
-                        indicator.innerHTML = '🟢 Online';
-                    }, 2000);
-                }
-            }, 30000);
+        function updateFirebaseStatus(text, bg, color) {
+            const status = document.getElementById('firebaseStatus');
+            if (status) {
+                status.textContent = text;
+                status.style.background = bg;
+                status.style.color = color;
+            }
         }
 
         // Add CSS animation
