@@ -531,28 +531,73 @@
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js';
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, addDoc, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js';
 
-        // 🔥 REPLACE THIS WITH YOUR FIREBASE CONFIG (from Step 1)
-        const firebaseConfig = {
-            // PASTE YOUR CONFIG HERE!
-            apiKey: "AIzaSyBna-YARBNGTEeF5hJg8oTwicaudRo8oqI",
-            authDomain: "shop-app-57cd9.firebaseapp.com",
-            projectId: "shop-app-57cd9",
-            storageBucket: "shop-app-57cd9.firebasestorage.app",
-            messagingSenderId: "166816611204",
-            appId: "1:166816611204:web:956843c5251e0171dc7bd1"
-        };
-
-        // Initialize Firebase
+        // � SECURE: Load Firebase config from server instead of hardcoding
         let db;
-        try {
-            const app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            console.log("🔥 Firebase connected successfully!");
-            updateFirebaseStatus("🔥 Connected to Firebase", "#c6f6d5", "#22543d");
-        } catch (error) {
-            console.error("Firebase connection failed:", error);
-            updateFirebaseStatus("❌ Firebase connection failed", "#fed7d7", "#c53030");
+        
+        async function loadFirebaseConfig() {
+            try {
+                updateFirebaseStatus("🔄 Loading secure config...", "#bee3f8", "#2b6cb0");
+                
+                const response = await fetch('/api/firebase-config');
+                if (!response.ok) {
+                    throw new Error(`Config fetch failed: ${response.status}`);
+                }
+                
+                const firebaseConfig = await response.json();
+                
+                // Validate config has required fields
+                const requiredFields = ['apiKey', 'authDomain', 'projectId'];
+                const missingFields = requiredFields.filter(field => !firebaseConfig[field]);
+                
+                if (missingFields.length > 0) {
+                    throw new Error(`Missing required config fields: ${missingFields.join(', ')}`);
+                }
+                
+                return firebaseConfig;
+            } catch (error) {
+                console.error("Failed to load Firebase config:", error);
+                updateFirebaseStatus("❌ Config load failed", "#fed7d7", "#c53030");
+                throw error;
+            }
         }
+
+        // Initialize Firebase with secure config
+        async function initializeFirebaseSecurely() {
+            try {
+                const firebaseConfig = await loadFirebaseConfig();
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                
+                console.log("🔥 Firebase connected securely!");
+                updateFirebaseStatus("� Securely connected", "#c6f6d5", "#22543d");
+                
+                // Make Firebase functions available globally after successful connection
+                window.db = db;
+                window.doc = doc;
+                window.setDoc = setDoc;
+                window.getDoc = getDoc;
+                window.onSnapshot = onSnapshot;
+                window.collection = collection;
+                window.addDoc = addDoc;
+                window.updateDoc = updateDoc;
+                window.deleteDoc = deleteDoc;
+                
+                // Initialize the app after Firebase is ready
+                if (typeof init === 'function') {
+                    init();
+                }
+                
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                updateFirebaseStatus("❌ Connection failed", "#fed7d7", "#c53030");
+                
+                // Show user-friendly error message
+                showNotification("⚠️ Unable to connect to cloud services. Some features may not work.", 'error');
+            }
+        }
+
+        // Start the secure initialization process
+        initializeFirebaseSecurely();
 
         function updateFirebaseStatus(text, bg, color) {
             const status = document.getElementById('firebaseStatus');
@@ -560,17 +605,6 @@
             status.style.background = bg;
             status.style.color = color;
         }
-
-        // Make Firebase functions available globally
-        window.db = db;
-        window.doc = doc;
-        window.setDoc = setDoc;
-        window.getDoc = getDoc;
-        window.onSnapshot = onSnapshot;
-        window.collection = collection;
-        window.addDoc = addDoc;
-        window.updateDoc = updateDoc;
-        window.deleteDoc = deleteDoc;
     </script>
 
     <script>
